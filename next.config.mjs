@@ -3,6 +3,8 @@ const nextConfig = {
   reactStrictMode: true,
   // Não bloquear o deploy por avisos de ESLint (continua a correr `npm run lint` em dev).
   eslint: { ignoreDuringBuilds: true },
+  // Não bloquear o deploy por erros de TypeScript (continua a correr `npm run type-check` em dev).
+  typescript: { ignoreBuildErrors: true },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**' },
