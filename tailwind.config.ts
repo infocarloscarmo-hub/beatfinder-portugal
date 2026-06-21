@@ -16,12 +16,20 @@ const config: Config = {
           700: '#181828',
           600: '#222238',
         },
-        // Subtle neon accents
+        // Paleta da marca (pôr do sol do logótipo: turquesa → laranja).
+        // Mantemos as chaves "neon.*" para não mexer em todos os componentes.
         neon: {
-          pink: '#ff2e88',
-          purple: '#8b5cf6',
+          purple: '#2dd4bf', // turquesa (cor primária)
+          cyan: '#22d3ee',   // ciano
+          pink: '#ff7a3c',   // laranja do pôr do sol
+          lime: '#fbbf24',   // âmbar/dourado (destaques quentes)
+        },
+        brand: {
+          teal: '#2dd4bf',
           cyan: '#22d3ee',
-          lime: '#a3e635',
+          orange: '#ff7a3c',
+          coral: '#ff5e5e',
+          amber: '#fbbf24',
         },
       },
       fontFamily: {
@@ -29,12 +37,13 @@ const config: Config = {
         display: ['var(--font-display)', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        neon: '0 0 0 1px rgba(139,92,246,0.25), 0 0 24px -6px rgba(139,92,246,0.45)',
-        'neon-pink': '0 0 0 1px rgba(255,46,136,0.25), 0 0 24px -6px rgba(255,46,136,0.45)',
+        neon: '0 0 0 1px rgba(45,212,191,0.25), 0 0 24px -6px rgba(45,212,191,0.50)',
+        'neon-pink': '0 0 0 1px rgba(255,122,60,0.25), 0 0 24px -6px rgba(255,122,60,0.50)',
       },
       backgroundImage: {
         'grid-fade':
-          'radial-gradient(circle at 50% 0%, rgba(139,92,246,0.12), transparent 60%)',
+          'radial-gradient(circle at 50% 0%, rgba(34,211,238,0.10), transparent 55%), radial-gradient(circle at 80% 10%, rgba(255,122,60,0.10), transparent 55%)',
+        'brand-gradient': 'linear-gradient(90deg, #2dd4bf 0%, #22d3ee 35%, #fbbf24 70%, #ff7a3c 100%)',
       },
       keyframes: {
         'fade-up': {

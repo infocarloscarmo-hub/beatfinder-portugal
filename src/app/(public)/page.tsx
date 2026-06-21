@@ -28,7 +28,7 @@ export default async function HomePage() {
         <div className="relative max-w-2xl">
           <span className="chip mb-4"><Sparkles size={13} /> Radar automático de eventos</span>
           <h1 className="font-display text-4xl font-black leading-tight text-white md:text-6xl">
-            Encontra a tua próxima <span className="text-neon-purple neon-text">festa</span> em Portugal.
+            Encontra a tua próxima <span className="brand-text">festa</span> em Portugal.
           </h1>
           <p className="mt-4 max-w-lg text-white/60">
             Festas, festivais e eventos de música eletrónica — descobertos
