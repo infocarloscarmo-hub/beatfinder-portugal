@@ -1,7 +1,7 @@
 import { getEvents } from '@/lib/queries';
 import EventGrid from '@/components/events/EventGrid';
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Festivais' };
 
 export default async function FestivaisPage() {

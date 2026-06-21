@@ -2,7 +2,7 @@ import { getEvents } from '@/lib/queries';
 import { weekendRange } from '@/lib/dates';
 import EventGrid from '@/components/events/EventGrid';
 
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Este fim de semana' };
 
 export default async function FimDeSemanaPage() {

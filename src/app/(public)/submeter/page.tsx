@@ -1,6 +1,7 @@
 import { getGenres } from '@/lib/queries';
 import SubmitForm from './SubmitForm';
 
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Submeter evento' };
 
 export default async function SubmeterPage() {

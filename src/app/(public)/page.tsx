@@ -6,7 +6,7 @@ import EventGrid from '@/components/events/EventGrid';
 import SearchBar from '@/components/events/SearchBar';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 
-export const revalidate = 300; // ISR 5 min
+export const dynamic = 'force-dynamic'; // render a pedido (não consulta o Supabase no build)
 
 export default async function HomePage() {
   const today = todayRange();

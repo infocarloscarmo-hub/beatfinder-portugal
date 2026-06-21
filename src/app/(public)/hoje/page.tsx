@@ -2,7 +2,7 @@ import { getEvents } from '@/lib/queries';
 import { todayRange } from '@/lib/dates';
 import EventGrid from '@/components/events/EventGrid';
 
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Eventos hoje' };
 
 export default async function HojePage() {

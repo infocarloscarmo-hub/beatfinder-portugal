@@ -2,7 +2,7 @@ import { getEvents, getGenres } from '@/lib/queries';
 import EventGrid from '@/components/events/EventGrid';
 import EventFilters from '@/components/events/EventFilters';
 
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Eventos' };
 
 export default async function EventosPage({

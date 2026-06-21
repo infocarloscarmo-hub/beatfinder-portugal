@@ -1,7 +1,7 @@
 import dynamic from 'next/dynamic';
 import { getEvents } from '@/lib/queries';
 
-export const revalidate = 300;
+export const revalidate = 0; // render a pedido (evita consulta ao Supabase no build)
 export const metadata = { title: 'Mapa' };
 
 const EventMap = dynamic(() => import('@/components/events/EventMap'), {

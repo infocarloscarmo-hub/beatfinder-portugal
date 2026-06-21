@@ -1,4 +1,6 @@
 import FavoritesClient from './FavoritesClient';
+
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Favoritos' };
 
 export default function FavoritosPage() {

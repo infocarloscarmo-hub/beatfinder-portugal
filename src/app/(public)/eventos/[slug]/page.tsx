@@ -9,7 +9,7 @@ import { formatPrice } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import FavoriteButton from '@/components/events/FavoriteButton';
 
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({
   params,
