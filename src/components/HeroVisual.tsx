@@ -158,7 +158,7 @@ export default function HeroVisual() {
       ctx.shadowBlur = 0;
 
       // ondas de choque na batida
-      const interval = audioBus.playing ? (60 / 138) * 1000 : 1700;
+      const interval = audioBus.playing ? (60 / 122) * 1000 : 1700;
       beatAcc += dt;
       if (beatAcc >= interval) {
         beatAcc = 0;
