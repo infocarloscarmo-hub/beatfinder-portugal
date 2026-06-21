@@ -1,14 +1,16 @@
 // ════════════════════════════════════════════════════════════════════
 // Tipos da base de dados Supabase.
 //
-// Este ficheiro é um esqueleto manual para o projeto compilar de imediato.
-// Depois de criares o projeto Supabase e aplicares as migrations, gera os
-// tipos reais (recomendado):
+// Esqueleto manual para o projeto compilar de imediato. Depois de aplicares
+// as migrations podes gerar os tipos reais (recomendado):
 //
 //   npx supabase login
 //   npx supabase link --project-ref <ref>
 //   npm run gen:types
 //
+// NOTA: usamos `type` (não `interface`) de propósito. Uma `interface` não
+// satisfaz `Record<string, unknown>` (falta-lhe index signature) e isso faz
+// o supabase-js degradar as tabelas para `never`, partindo os `.insert()`.
 // ════════════════════════════════════════════════════════════════════
 
 export type EventStatus = 'pending' | 'approved' | 'rejected' | 'duplicate';
@@ -17,7 +19,7 @@ export type EventTypeEnum =
 export type AppRole = 'user' | 'moderator' | 'admin';
 export type AlertFrequency = 'instant' | 'daily' | 'weekly';
 
-export interface EventRow {
+export type EventRow = {
   id: string;
   title: string;
   slug: string;
@@ -48,9 +50,9 @@ export interface EventRow {
   raw_payload: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface EventPublicRow extends EventRow {
+export type EventPublicRow = EventRow & {
   venue_name: string | null;
   venue_address: string | null;
   venue_city: string | null;
@@ -58,17 +60,17 @@ export interface EventPublicRow extends EventRow {
   genre_slug: string | null;
   genre_color: string | null;
   organizer_name: string | null;
-}
+};
 
-export interface GenreRow {
+export type GenreRow = {
   id: string;
   name: string;
   slug: string;
   color: string | null;
   created_at: string;
-}
+};
 
-export interface VenueRow {
+export type VenueRow = {
   id: string;
   name: string;
   slug: string | null;
@@ -82,9 +84,9 @@ export interface VenueRow {
   website: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface ProfileRow {
+export type ProfileRow = {
   id: string;
   email: string | null;
   full_name: string | null;
@@ -93,21 +95,28 @@ export interface ProfileRow {
   city: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-// Tipo Database mínimo compatível com @supabase/supabase-js.
-// Substituível pela geração automática.
+type AnyRow = Record<string, unknown>;
+type GenericTable<R = AnyRow> = {
+  Row: R;
+  Insert: Partial<R> & AnyRow;
+  Update: Partial<R> & AnyRow;
+  Relationships: [];
+};
+
+// Tipo Database compatível com @supabase/supabase-js.
 export type Database = {
   public: {
     Tables: {
-      events: { Row: EventRow; Insert: Partial<EventRow>; Update: Partial<EventRow>; Relationships: [] };
-      genres: { Row: GenreRow; Insert: Partial<GenreRow>; Update: Partial<GenreRow>; Relationships: [] };
-      venues: { Row: VenueRow; Insert: Partial<VenueRow>; Update: Partial<VenueRow>; Relationships: [] };
-      organizers: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown>; Relationships: [] };
-      event_sources: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown>; Relationships: [] };
-      featured_events: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown>; Relationships: [] };
-      alerts: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown>; Relationships: [] };
-      profiles: { Row: ProfileRow; Insert: Partial<ProfileRow>; Update: Partial<ProfileRow>; Relationships: [] };
+      events: GenericTable<EventRow>;
+      genres: GenericTable<GenreRow>;
+      venues: GenericTable<VenueRow>;
+      organizers: GenericTable;
+      event_sources: GenericTable;
+      featured_events: GenericTable;
+      alerts: GenericTable;
+      profiles: GenericTable<ProfileRow>;
       favorites: {
         Row: { user_id: string; event_id: string; created_at: string };
         Insert: { user_id: string; event_id: string };
