@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { fetchGoabaseEvents } from '@/lib/sources/goabase';
-import { fetchTicketmasterEvents } from '@/lib/sources/ticketmaster';
 import { ingestEvents } from '@/lib/ingest';
 
 export const runtime = 'nodejs';
@@ -10,11 +9,11 @@ export const maxDuration = 60;
 /**
  * Recolha de TODAS as fontes (chamado pelo agendamento da Vercel — ver vercel.json).
  * Cada fonte é independente: se uma falhar, as outras continuam.
+ * Para acrescentar uma fonte nova: cria src/lib/sources/<nome>.ts e adiciona-a à lista.
  */
 async function handle() {
   const sources: { name: string; fn: () => Promise<any[]> }[] = [
     { name: 'goabase', fn: fetchGoabaseEvents },
-    { name: 'ticketmaster', fn: fetchTicketmasterEvents },
   ];
 
   const summary: any[] = [];

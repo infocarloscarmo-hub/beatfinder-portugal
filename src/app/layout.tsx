@@ -7,6 +7,7 @@ import BottomNav from '@/components/layout/BottomNav';
 import Footer from '@/components/layout/Footer';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 import InstallPrompt from '@/components/InstallPrompt';
+import MusicToggle from '@/components/MusicToggle';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const display = Space_Grotesk({ subsets: ['latin'], variable: '--font-display' });
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Footer />
         <BottomNav />
         <InstallPrompt />
+        <MusicToggle />
         <ServiceWorkerRegister />
       </body>
     </html>

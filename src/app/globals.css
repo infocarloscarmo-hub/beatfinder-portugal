@@ -47,6 +47,12 @@ html, body {
   .label { @apply mb-1.5 block text-sm font-medium text-white/70; }
 }
 
+/* Animação das barras de equalizador (botão de música) */
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
 /* Leaflet em tema escuro */
 .leaflet-container { background: #0a0a12 !important; }
 .leaflet-tile { filter: brightness(0.7) invert(1) contrast(0.85) hue-rotate(200deg) saturate(0.5); }
