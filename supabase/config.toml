@@ -1,0 +1,5 @@
+# Configuração mínima do projeto Supabase (CLI)
+project_id = "beatfinder-portugal"
+
+[db]
+major_version = 15

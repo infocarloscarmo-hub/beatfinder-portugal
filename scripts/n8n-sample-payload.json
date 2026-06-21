@@ -1,0 +1,27 @@
+{
+  "events": [
+    {
+      "title": "Amelie Lens @ Lux Frágil",
+      "summary": "Techno belga no Lux.",
+      "description": "Line-up: Amelie Lens, Farrago.\nDoors 23:59.",
+      "date_start": "2026-07-10T23:59:00+01:00",
+      "date_end": "2026-07-11T06:00:00+01:00",
+      "city": "Lisboa",
+      "venue_name": "Lux Frágil",
+      "venue_address": "Av. Infante Dom Henrique, Lisboa",
+      "organizer_name": "Lux Frágil",
+      "genre": "techno",
+      "event_type": "club",
+      "price_min": 18,
+      "price_max": 25,
+      "ticket_url": "https://example.com/tickets",
+      "source_url": "https://ra.co/events/123456",
+      "image_url": "https://example.com/poster.jpg",
+      "latitude": 38.7169,
+      "longitude": -9.1227,
+      "external_id": "ra-123456",
+      "confidence_score": 0.92,
+      "source_name": "Resident Advisor — Portugal"
+    }
+  ]
+}

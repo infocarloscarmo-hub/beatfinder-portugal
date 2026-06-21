@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#06060a" />
+<meta name="description" content="Radar automático de festas e festivais de música eletrónica em Portugal." />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+<link rel="icon" href="./favicon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Beatfinder Portugal — Demo</title>
+
+<!-- Leaflet (mapa) — carrega da net; se offline, mostra fallback -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<style>
+  :root{
+    --ink-950:#06060a; --ink-900:#0a0a12; --ink-800:#10101c; --ink-700:#181828;
+    --purple:#8b5cf6; --pink:#ff2e88; --cyan:#22d3ee; --lime:#a3e635;
+    --txt:#f5f5f7; --muted:rgba(245,245,247,.55); --line:rgba(255,255,255,.07);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--ink-950);color:var(--txt);
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(circle at 50% 0%,rgba(139,92,246,.13),transparent 60%)}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:var(--ink-900)}
+  ::-webkit-scrollbar-thumb{background:#222238;border-radius:99px}
+
+  /* Layout */
+  .wrap{max-width:1100px;margin:0 auto;padding:16px 16px 110px}
+  @media(min-width:768px){.wrap{padding-bottom:48px}}
+
+  /* Topbar */
+  header.top{position:sticky;top:0;z-index:40;border-bottom:1px solid var(--line);
+    background:rgba(6,6,10,.8);backdrop-filter:blur(14px)}
+  .topbar{max-width:1100px;margin:0 auto;height:56px;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;padding:0 16px}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;letter-spacing:-.02em}
+  .logo .mark{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--purple),var(--pink));font-weight:900;color:#fff;
+    box-shadow:0 0 24px -6px rgba(139,92,246,.6)}
+  .logo .glow{color:var(--purple);text-shadow:0 0 18px rgba(139,92,246,.6)}
+  nav.desk{display:none;gap:4px}
+  @media(min-width:880px){nav.desk{display:flex}}
+  nav.desk a{padding:8px 12px;border-radius:9px;font-size:14px;font-weight:500;color:var(--muted)}
+  nav.desk a:hover{color:#fff}
+  nav.desk a.active{background:rgba(255,255,255,.1);color:#fff}
+  .top-actions{display:flex;align-items:center;gap:4px}
+  .icon-btn{padding:8px;border-radius:9px;color:var(--muted);background:none;border:0;cursor:pointer}
+  .icon-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+
+  /* Buttons / chips */
+  .btn{display:inline-flex;align-items:center;gap:7px;border-radius:11px;padding:10px 16px;
+    font-size:14px;font-weight:600;cursor:pointer;border:0;transition:.15s}
+  .btn-primary{background:var(--purple);color:#fff}
+  .btn-primary:hover{filter:brightness(1.1)}
+  .btn-ghost{background:rgba(255,255,255,.05);color:#fff;border:1px solid var(--line)}
+  .btn-ghost:hover{background:rgba(255,255,255,.1)}
+  .chip{display:inline-flex;align-items:center;gap:5px;border-radius:99px;
+    border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);
+    padding:4px 11px;font-size:12px;font-weight:500;color:rgba(245,245,247,.85)}
+  .card{border-radius:18px;border:1px solid var(--line);background:rgba(16,16,28,.6);backdrop-filter:blur(8px)}
+
+  /* Hero */
+  .hero{position:relative;overflow:hidden;border-radius:26px;border:1px solid var(--line);
+    background:linear-gradient(135deg,var(--ink-800),var(--ink-900) 60%,var(--ink-950));
+    padding:44px 26px}
+  @media(min-width:768px){.hero{padding:64px 52px}}
+  .hero .b1{position:absolute;right:-80px;top:-80px;width:260px;height:260px;border-radius:99px;
+    background:rgba(139,92,246,.2);filter:blur(60px)}
+  .hero .b2{position:absolute;left:-40px;bottom:-96px;width:260px;height:260px;border-radius:99px;
+    background:rgba(255,46,136,.16);filter:blur(60px)}
+  .hero h1{position:relative;font-size:38px;line-height:1.05;font-weight:900;margin:14px 0 0;letter-spacing:-.03em}
+  @media(min-width:768px){.hero h1{font-size:60px}}
+  .hero p.sub{position:relative;color:var(--muted);max-width:520px;margin-top:16px}
+  .hero .cta{position:relative;display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+
+  /* Search */
+  .search{position:relative;max-width:440px;margin-top:22px}
+  .search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.4)}
+  .input{width:100%;border-radius:12px;border:1px solid var(--line);background:var(--ink-900);
+    color:#fff;font-size:14px;padding:11px 14px;outline:none}
+  .input::placeholder{color:rgba(255,255,255,.4)}
+  .input:focus{border-color:rgba(139,92,246,.6);box-shadow:0 0 0 3px rgba(139,92,246,.18)}
+  .search .input{padding-left:42px}
+  label.lbl{display:block;font-size:13px;color:rgba(255,255,255,.7);margin-bottom:6px}
+
+  /* Section header */
+  .sec{margin-top:46px}
+  .sec-head{display:flex;align-items:end;justify-content:space-between;margin-bottom:16px}
+  .sec-head h2{font-size:22px;font-weight:800;margin:0;letter-spacing:-.02em}
+  @media(min-width:768px){.sec-head h2{font-size:26px}}
+  .sec-head .hint{font-size:14px;color:var(--muted);margin:2px 0 0}
+  .sec-head a{font-size:14px;font-weight:500;color:var(--purple)}
+
+  /* Grid + cards */
+  .grid{display:grid;grid-template-columns:1fr;gap:16px}
+  @media(min-width:600px){.grid{grid-template-columns:1fr 1fr}}
+  @media(min-width:980px){.grid{grid-template-columns:1fr 1fr 1fr}}
+  .ev{overflow:hidden;cursor:pointer;transition:.18s;border-radius:18px;border:1px solid var(--line);
+    background:rgba(16,16,28,.6)}
+  .ev:hover{transform:translateY(-3px);border-color:rgba(139,92,246,.35);
+    box-shadow:0 0 28px -8px rgba(139,92,246,.5)}
+  .ev .ph{position:relative;aspect-ratio:16/10;background:linear-gradient(135deg,var(--ink-700),var(--ink-900));
+    display:grid;place-items:center;font-size:30px;overflow:hidden}
+  .ev .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .ev .ph::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(10,10,18,.9),transparent 55%)}
+  .ev .date{position:absolute;left:12px;bottom:10px;z-index:2;font-size:12px;font-weight:600;color:var(--cyan)}
+  .ev .fav{position:absolute;right:10px;top:10px;z-index:2;border:1px solid var(--line);
+    background:rgba(10,10,18,.7);border-radius:99px;padding:7px;cursor:pointer;color:#fff;line-height:0}
+  .ev .fav.on{color:var(--pink);border-color:rgba(255,46,136,.4)}
+  .ev .star{position:absolute;left:12px;top:10px;z-index:2;background:rgba(255,46,136,.92);
+    color:#fff;border-radius:99px;padding:3px 9px;font-size:10px;font-weight:800;text-transform:uppercase}
+  .ev .body{padding:15px}
+  .ev .body h3{font-size:16px;font-weight:800;margin:0 0 8px;line-height:1.2;letter-spacing:-.01em}
+  .ev .meta{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
+  .ev .foot{display:flex;align-items:center;gap:8px;margin-top:12px}
+  .ev .price{margin-left:auto;font-weight:700;font-size:14px}
+
+  /* Filters */
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+  @media(min-width:768px){.filters{grid-template-columns:repeat(4,1fr)}}
+  select.input{appearance:none}
+
+  /* Detail */
+  .detail-hero{position:relative;aspect-ratio:16/9;border-radius:24px;overflow:hidden;border:1px solid var(--line);
+    background:var(--ink-700);display:grid;place-items:center;font-size:54px}
+  .detail-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .detail-grid{display:grid;grid-template-columns:1fr;gap:28px;margin-top:28px}
+  @media(min-width:820px){.detail-grid{grid-template-columns:2fr 1fr}}
+  .info-row{display:flex;gap:12px;align-items:flex-start;padding:6px 0}
+  .info-row small{display:block;text-transform:uppercase;font-size:11px;letter-spacing:.05em;color:rgba(255,255,255,.4)}
+
+  /* Map */
+  #map{height:68vh;border-radius:18px;border:1px solid var(--line);overflow:hidden}
+  .leaflet-container{background:var(--ink-900)!important}
+  .leaflet-tile{filter:brightness(.7) invert(1) contrast(.85) hue-rotate(200deg) saturate(.5)}
+  .map-fallback{height:68vh;display:grid;place-items:center;text-align:center;color:var(--muted)}
+
+  /* Empty */
+  .empty{border:1px dashed rgba(255,255,255,.12);border-radius:18px;padding:60px 20px;text-align:center}
+  .empty .ico{font-size:38px;margin-bottom:10px}
+
+  /* Bottom nav (mobile) */
+  .bnav{position:fixed;inset:auto 0 0 0;z-index:40;border-top:1px solid rgba(255,255,255,.1);
+    background:rgba(6,6,10,.92);backdrop-filter:blur(14px)}
+  @media(min-width:880px){.bnav{display:none}}
+  .bnav .row{max-width:460px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+  .bnav a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0;
+    font-size:10px;font-weight:500;color:rgba(255,255,255,.5)}
+  .bnav a.active{color:var(--purple)}
+  .bnav a.active svg{filter:drop-shadow(0 0 6px rgba(139,92,246,.7))}
+
+  /* Install banner */
+  .install{position:fixed;left:12px;right:12px;bottom:78px;z-index:50;max-width:440px;margin:0 auto;
+    display:none}
+  @media(min-width:880px){.install{bottom:18px}}
+  .install.show{display:block;animation:up .4s ease both}
+  @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .install .inner{display:flex;align-items:center;gap:12px;border-radius:18px;
+    border:1px solid rgba(139,92,246,.3);background:rgba(16,16,28,.92);padding:12px;
+    box-shadow:0 0 28px -8px rgba(139,92,246,.5)}
+
+  .demo-tag{position:fixed;top:64px;right:12px;z-index:30;font-size:10px;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--purple);border:1px solid rgba(139,92,246,.3);
+    background:rgba(139,92,246,.08);padding:3px 9px;border-radius:99px}
+  .footer{border-top:1px solid var(--line);margin-top:60px;padding:30px 16px;color:rgba(255,255,255,.4);
+    text-align:center;font-size:13px}
+  .badge-genre{border:1px solid;border-radius:99px;padding:3px 10px;font-size:11px;font-weight:600}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="topbar">
+    <a class="logo" href="#/" onclick="go('home',event)">
+      <span class="mark">B</span> Beat<span class="glow">finder</span>
+    </a>
+    <nav class="desk" id="deskNav"></nav>
+    <div class="top-actions">
+      <button class="icon-btn" onclick="go('pesquisa')" aria-label="Pesquisar">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="6"/><path d="m20 20-5-5"/></svg>
+      </button>
+      <button class="icon-btn" onclick="go('favoritos')" aria-label="Favoritos">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17s-6-4.35-6-8.5A3.5 3.5 0 0 1 10 6a3.5 3.5 0 0 1 6 2.5C16 12.65 10 17 10 17Z"/></svg>
+      </button>
+      <button class="btn btn-primary" onclick="go('submeter')" style="margin-left:6px">Submeter</button>
+    </div>
+  </div>
+</header>
+
+<span class="demo-tag">Demo · dados de exemplo</span>
+
+<div class="wrap" id="app"></div>
+
+<nav class="bnav"><div class="row" id="bnav"></div></nav>
+
+<div class="install" id="install">
+  <div class="inner">
+    <div style="background:rgba(139,92,246,.15);color:var(--purple);border-radius:11px;padding:9px;line-height:0">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3v9m0 0 3-3m-3 3-3-3M4 15h12"/></svg>
+    </div>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:14px">Instalar Beatfinder</div>
+      <div style="font-size:12px;color:var(--muted)">Adiciona ao teu ecrã principal.</div>
+    </div>
+    <button class="btn btn-primary" id="installBtn">Instalar</button>
+    <button class="icon-btn" onclick="document.getElementById('install').classList.remove('show')">✕</button>
+  </div>
+</div>
+
+<footer class="footer">
+  © <span id="yr"></span> Beatfinder Portugal · Demo estática (a app real usa Next.js + Supabase)
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ─────────────────────────────────────────────────────────────
+   DADOS DE EXEMPLO
+   ───────────────────────────────────────────────────────────── */
+const GENRES = {
+  techno:{name:'Techno',color:'#22d3ee'}, house:{name:'House',color:'#a3e635'},
+  melodic:{name:'Melodic Techno',color:'#8b5cf6'}, afro:{name:'Afro House',color:'#f59e0b'},
+  dnb:{name:'Drum & Bass',color:'#fb7185'}, trance:{name:'Trance',color:'#f472b6'},
+  disco:{name:'Disco / Nu-Disco',color:'#ff2e88'}, minimal:{name:'Minimal',color:'#60a5fa'},
+};
+const D = (off,h=23,m=0)=>{const d=new Date();d.setDate(d.getDate()+off);d.setHours(h,m,0,0);return d.toISOString();};
+const EVENTS = [
+  {id:'1',slug:'amelie-lens-lux',title:'Amelie Lens @ Lux Frágil',genre:'techno',city:'Lisboa',venue:'Lux Frágil',addr:'Av. Infante D. Henrique',date:D(0,23,59),end:D(1,6),min:18,max:25,featured:true,festival:false,type:'Club',img:'https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?w=900&q=70',lat:38.7169,lng:-9.1227,summary:'Techno belga, noite longa no Lux.',desc:'Line-up: Amelie Lens, Farrago.\nPortas às 23:59. +18.',src:'https://ra.co/events/'},
+  {id:'2',slug:'boris-brejcha-porto',title:'Boris Brejcha — High-Tech Minimal',genre:'minimal',city:'Porto',venue:'Hard Club',addr:'Mercado Ferreira Borges',date:D(1,22),end:D(2,5),min:30,max:45,featured:true,festival:false,type:'Club',img:'https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=900&q=70',lat:41.1410,lng:-8.6155,summary:'O mestre da máscara no Porto.',desc:'Uma noite de high-tech minimal.',src:'https://ra.co/events/'},
+  {id:'3',slug:'afro-rooftop-lisboa',title:'Afro Rooftop Sunset',genre:'afro',city:'Lisboa',venue:'Park Bar',addr:'Calçada do Combro',date:D(2,18),end:D(2,23),min:0,max:0,featured:false,festival:false,type:'Open Air',img:'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=900&q=70',lat:38.7106,lng:-9.1466,summary:'Pôr do sol com afro house.',desc:'Entrada livre até às 19h.',src:'https://instagram.com/'},
+  {id:'4',slug:'neopop-festival',title:'NEOPOP Festival 2026',genre:'techno',city:'Viana do Castelo',venue:'Forte de Santiago',addr:'Forte de Santiago da Barra',date:D(5,17),end:D(8,6),min:89,max:139,featured:true,festival:true,type:'Festival',img:'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=900&q=70',lat:41.6932,lng:-8.8519,summary:'3 dias de techno à beira-mar.',desc:'Cartaz internacional. Bilhetes em fases.',src:'https://ra.co/events/'},
+  {id:'5',slug:'house-boat-party',title:'Sunset Boat Party — House Edition',genre:'house',city:'Lisboa',venue:'Doca de Santo Amaro',addr:'Doca de Santo Amaro',date:D(6,16),end:D(6,21),min:22,max:22,featured:false,festival:false,type:'Boat',img:'https://images.unsplash.com/photo-1571935441005-16ba6f0d83b8?w=900&q=70',lat:38.7035,lng:-9.1738,summary:'House no Tejo ao pôr do sol.',desc:'Inclui welcome drink.',src:'https://instagram.com/'},
+  {id:'6',slug:'melodic-night-braga',title:'Melodic Night — ARTBAT (DJ set)',genre:'melodic',city:'Braga',venue:'GNRation',addr:'Praça Conde de Agrolongo',date:D(7,23),end:D(8,5),min:25,max:35,featured:false,festival:false,type:'Club',img:'https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?w=900&q=70',lat:41.5503,lng:-8.4265,summary:'Melodic techno em Braga.',desc:'Aftermovie do ano passado disponível.',src:'https://ra.co/events/'},
+  {id:'7',slug:'dnb-warehouse-porto',title:'Warehouse: Drum & Bass All Night',genre:'dnb',city:'Porto',venue:'Armazém 22',addr:'Zona Industrial',date:D(8,23,30),end:D(9,7),min:15,max:20,featured:false,festival:false,type:'Rave',img:'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=900&q=70',lat:41.18,lng:-8.62,summary:'DnB cru num armazém.',desc:'Localização revelada 24h antes.',src:'https://instagram.com/'},
+  {id:'8',slug:'kappa-futur-coimbra',title:'Disco Inferno — Nu-Disco Night',genre:'disco',city:'Coimbra',venue:'Sala 30',addr:'Rua Olímpio N. Fernandes',date:D(9,23),end:D(10,5),min:12,max:16,featured:false,festival:false,type:'Club',img:'https://images.unsplash.com/photo-1429962714451-bb934ecdc4ec?w=900&q=70',lat:40.2056,lng:-8.4196,summary:'Groove disco em Coimbra.',desc:'Dress code: brilho.',src:'https://ra.co/events/'},
+  {id:'9',slug:'trance-reunion-faro',title:'Trance Reunion — Classics',genre:'trance',city:'Faro',venue:'Colombus Club',addr:'Marina de Faro',date:D(12,23),end:D(13,6),min:20,max:28,featured:false,festival:true,type:'Festival',img:'https://images.unsplash.com/photo-1483393458019-411bc6bd104e?w=900&q=70',lat:37.0146,lng:-7.9352,summary:'Os clássicos do trance no Algarve.',desc:'Edição especial verão.',src:'https://ra.co/events/'},
+];
+
+/* ─────────────────────────────────────────────────────────────
+   ESTADO / HELPERS
+   ───────────────────────────────────────────────────────────── */
+let FAVS = new Set(JSON.parse(localStorage.getItem('bf_demo_favs')||'[]'));
+const saveFavs = ()=>localStorage.setItem('bf_demo_favs',JSON.stringify([...FAVS]));
+const F = {city:'',genre:'',type:'',priceMax:''};
+let SEARCH='';
+
+const NAV=[['home','Início'],['eventos','Eventos'],['hoje','Hoje'],['fim-de-semana','Fim de semana'],['festivais','Festivais'],['mapa','Mapa']];
+const fmtPrice=(a,b)=>{ if(a==null&&b==null)return 'A confirmar'; if(!a&&!b)return 'Grátis';
+  const f=n=>n%1?'€'+n.toFixed(2):'€'+n; return a&&b&&a!==b?`${f(a)}–${f(b)}`:f(a||b);};
+const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'], MON=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+function fmtDate(iso){const d=new Date(iso),n=new Date();const sameDay=x=>x.toDateString()===d.toDateString();
+  const t=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  if(sameDay(n))return `Hoje · ${t}`; const tm=new Date(n);tm.setDate(n.getDate()+1);
+  if(sameDay(tm))return `Amanhã · ${t}`; return `${DAYS[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()]} · ${t}`;}
+function fmtLong(iso){const d=new Date(iso);return `${DAYS[d.getDay()]}, ${d.getDate()} de ${['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function isToday(iso){return new Date(iso).toDateString()===new Date().toDateString();}
+function isWeekend(iso){const d=new Date(iso),day=d.getDay();return day===5||day===6||day===0;}
+
+/* ─────────────────────────────────────────────────────────────
+   COMPONENTES
+   ───────────────────────────────────────────────────────────── */
+function heart(on){return `<svg width="18" height="18" fill="${on?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M9 16s-5.5-3.9-5.5-7.7A3.2 3.2 0 0 1 9 5.5a3.2 3.2 0 0 1 5.5 2.8C14.5 12.1 9 16 9 16Z"/></svg>`;}
+function genreBadge(g){const x=GENRES[g];if(!x)return '';return `<span class="badge-genre" style="border-color:${x.color}55;color:${x.color}">${x.name}</span>`;}
+
+function evCard(e){
+  return `<div class="ev" onclick="go('evento/${e.slug}')">
+    <div class="ph">${e.img?`<img loading="lazy" src="${e.img}" alt="">`:'🎵'}
+      ${e.featured?'<span class="star">★ Destaque</span>':''}
+      <button class="fav ${FAVS.has(e.id)?'on':''}" onclick="event.stopPropagation();toggleFav('${e.id}',this)">${heart(FAVS.has(e.id))}</button>
+      <span class="date">${fmtDate(e.date)}</span>
+    </div>
+    <div class="body">
+      <h3>${esc(e.title)}</h3>
+      <div class="meta">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 13s5-3.6 5-7A5 5 0 0 0 2 6c0 3.4 5 7 5 7Z"/><circle cx="7" cy="6" r="1.6"/></svg>
+        ${esc(e.venue)} · ${esc(e.city)}
+      </div>
+      <div class="foot">${genreBadge(e.genre)}<span class="price">${fmtPrice(e.min,e.max)}</span></div>
+    </div>
+  </div>`;
+}
+function grid(list,emptyTitle,ico='🎧'){
+  if(!list.length)return `<div class="empty"><div class="ico">${ico}</div><h3 style="margin:0">${emptyTitle}</h3>
+    <p style="color:var(--muted);margin:6px 0 0">Volta em breve — o radar está sempre a procurar.</p></div>`;
+  return `<div class="grid">${list.map(evCard).join('')}</div>`;
+}
+function secHead(title,hint,link){
+  return `<div class="sec-head"><div><h2>${title}</h2>${hint?`<p class="hint">${hint}</p>`:''}</div>
+    ${link?`<a href="#" onclick="go('${link}',event)">Ver tudo →</a>`:''}</div>`;
+}
+const upcoming=()=>EVENTS.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+/* ─────────────────────────────────────────────────────────────
+   VISTAS
+   ───────────────────────────────────────────────────────────── */
+const VIEWS={
+  home(){
+    const feat=upcoming().filter(e=>e.featured);
+    const today=upcoming().filter(e=>isToday(e.date));
+    const wknd=upcoming().filter(e=>isWeekend(e.date));
+    return `
+    <section class="hero">
+      <div class="b1"></div><div class="b2"></div>
+      <span class="chip" style="position:relative">✦ Radar automático de eventos</span>
+      <h1>Encontra a tua próxima <span class="glow">festa</span> em Portugal.</h1>
+      <p class="sub">Festas, festivais e eventos de música eletrónica — descobertos automaticamente e organizados num só sítio.</p>
+      <div class="search">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/><path d="m18 18-4.5-4.5"/></svg>
+        <input class="input" placeholder="Procurar artistas, clubes, festivais…" onkeydown="if(event.key==='Enter'){SEARCH=this.value;go('pesquisa')}">
+      </div>
+      <div class="cta">
+        <button class="btn btn-ghost" onclick="go('hoje')">📅 Hoje</button>
+        <button class="btn btn-ghost" onclick="go('fim-de-semana')">Fim de semana</button>
+        <button class="btn btn-ghost" onclick="go('mapa')">📍 Mapa</button>
+      </div>
+    </section>
+    <section class="sec">${secHead('Em destaque','Eventos recomendados')}${grid(feat,'Sem destaques')}</section>
+    <section class="sec">${secHead('Hoje','O que se passa esta noite','hoje')}${grid(today,'Nada para hoje ainda')}</section>
+    <section class="sec">${secHead('Este fim de semana','','fim-de-semana')}${grid(wknd,'Sem eventos este fim de semana')}</section>
+    <section class="sec">${secHead('A não perder','Próximos eventos','eventos')}${grid(upcoming().slice(0,6),'Sem eventos')}
+      <div style="text-align:center;margin-top:24px"><button class="btn btn-primary" onclick="go('eventos')">Ver todos os eventos →</button></div>
+    </section>`;
+  },
+  eventos(){
+    let list=upcoming();
+    if(F.city)list=list.filter(e=>e.city===F.city);
+    if(F.genre)list=list.filter(e=>e.genre===F.genre);
+    if(F.type)list=list.filter(e=>e.type===F.type);
+    if(F.priceMax)list=list.filter(e=>(e.min||0)<=+F.priceMax);
+    const cities=[...new Set(EVENTS.map(e=>e.city))].sort();
+    const types=[...new Set(EVENTS.map(e=>e.type))];
+    const opt=(arr,sel,map=x=>x)=>arr.map(v=>`<option value="${map(v)}" ${sel===map(v)?'selected':''}>${v}</option>`).join('');
+    return `<h1 style="font-size:30px;font-weight:800;margin:0">Todos os eventos</h1>
+      <p style="color:var(--muted);margin:4px 0 18px">${list.length} eventos encontrados</p>
+      <div class="card" style="margin-bottom:24px">
+        <div class="filters">
+          <div><label class="lbl">Cidade</label><select class="input" onchange="F.city=this.value;render()"><option value="">Todas</option>${opt(cities,F.city)}</select></div>
+          <div><label class="lbl">Género</label><select class="input" onchange="F.genre=this.value;render()"><option value="">Todos</option>${Object.entries(GENRES).map(([k,v])=>`<option value="${k}" ${F.genre===k?'selected':''}>${v.name}</option>`).join('')}</select></div>
+          <div><label class="lbl">Tipo</label><select class="input" onchange="F.type=this.value;render()"><option value="">Todos</option>${opt(types,F.type)}</select></div>
+          <div><label class="lbl">Preço máx. (€)</label><input class="input" type="number" min="0" placeholder="Qualquer" value="${F.priceMax}" onchange="F.priceMax=this.value;render()"></div>
+        </div>
+      </div>
+      ${grid(list,'Nenhum evento corresponde aos filtros')}`;
+  },
+  hoje(){return `<h1 style="font-size:30px;font-weight:800;margin:0 0 4px">Eventos hoje</h1>
+    <p style="color:var(--muted);margin:0 0 24px">O que se passa esta noite em Portugal.</p>
+    ${grid(upcoming().filter(e=>isToday(e.date)),'Nada para hoje','🌙')}`;},
+  'fim-de-semana'(){return `<h1 style="font-size:30px;font-weight:800;margin:0 0 4px">Este fim de semana</h1>
+    <p style="color:var(--muted);margin:0 0 24px">Sexta a domingo — planeia já.</p>
+    ${grid(upcoming().filter(e=>isWeekend(e.date)),'Sem eventos este fim de semana')}`;},
+  festivais(){return `<h1 style="font-size:30px;font-weight:800;margin:0 0 4px">Festivais</h1>
+    <p style="color:var(--muted);margin:0 0 24px">Os grandes festivais de música eletrónica em Portugal.</p>
+    ${grid(upcoming().filter(e=>e.festival),'Sem festivais listados','🎪')}`;},
+  pesquisa(){
+    const q=SEARCH.trim().toLowerCase();
+    const list=q?upcoming().filter(e=>(e.title+e.city+e.venue+(GENRES[e.genre]?.name||'')).toLowerCase().includes(q)):[];
+    return `<h1 style="font-size:30px;font-weight:800;margin:0 0 16px">Pesquisa</h1>
+      <div class="search" style="max-width:560px;margin:0 0 18px">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/><path d="m18 18-4.5-4.5"/></svg>
+        <input class="input" id="sq" placeholder="Procurar…" value="${esc(SEARCH)}" oninput="SEARCH=this.value;clearTimeout(window._t);window._t=setTimeout(()=>{render();document.getElementById('sq')?.focus()},250)">
+      </div>
+      ${q?`<p style="color:var(--muted);font-size:14px">${list.length} resultados para “${esc(SEARCH)}”.</p>${grid(list,'Nada encontrado','🔍')}`
+        :'<p style="color:rgba(255,255,255,.4)">Escreve algo para procurar eventos.</p>'}`;
+  },
+  favoritos(){
+    const list=upcoming().filter(e=>FAVS.has(e.id));
+    return `<h1 style="font-size:30px;font-weight:800;margin:0 0 4px">Os teus favoritos</h1>
+      <p style="color:var(--muted);margin:0 0 24px">Eventos que guardaste para não perder.</p>
+      ${grid(list,'Ainda sem favoritos','🤍')}`;
+  },
+  submeter(){
+    return `<div style="max-width:620px;margin:0 auto">
+      <h1 style="font-size:30px;font-weight:800;margin:0 0 4px">Submeter evento</h1>
+      <p style="color:var(--muted);margin:0 0 24px">Conheces uma festa que falta? Envia — depois de revista, fica visível para todos.</p>
+      <form class="card" style="padding:24px;display:grid;gap:16px" onsubmit="event.preventDefault();this.style.display='none';document.getElementById('okMsg').style.display='block'">
+        <div><label class="lbl">Título *</label><input class="input" required placeholder="Ex: Charlotte de Witte @ ..."></div>
+        <div><label class="lbl">Resumo</label><input class="input" placeholder="Uma frase sobre o evento"></div>
+        <div><label class="lbl">Descrição</label><textarea class="input" rows="4" placeholder="Line-up, detalhes…"></textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div><label class="lbl">Início *</label><input class="input" type="datetime-local" required></div>
+          <div><label class="lbl">Fim</label><input class="input" type="datetime-local"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div><label class="lbl">Cidade *</label><input class="input" required placeholder="Lisboa"></div>
+          <div><label class="lbl">Local / Sala</label><input class="input" placeholder="Lux Frágil"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div><label class="lbl">Género</label><select class="input"><option value="">—</option>${Object.values(GENRES).map(g=>`<option>${g.name}</option>`).join('')}</select></div>
+          <div><label class="lbl">Preço (€)</label><input class="input" type="number" min="0" placeholder="0"></div>
+        </div>
+        <div><label class="lbl">Link de bilhetes / fonte</label><input class="input" placeholder="https://…"></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center">Submeter evento</button>
+      </form>
+      <div id="okMsg" class="card" style="display:none;padding:40px;text-align:center">
+        <div style="font-size:40px">✅</div>
+        <p style="font-weight:700;font-size:18px;margin:10px 0 0">Obrigado! (demo) O evento seria enviado para revisão.</p>
+        <button class="btn btn-ghost" style="margin-top:14px" onclick="go('eventos')">Ver eventos</button>
+      </div>
+    </div>`;
+  },
+  mapa(){
+    setTimeout(initMap,60);
+    return `<h1 style="font-size:30px;font-weight:800;margin:0 0 4px">Mapa de eventos</h1>
+      <p style="color:var(--muted);margin:0 0 18px">Explora o que se passa perto de ti.</p>
+      <div id="map"></div>`;
+  },
+  evento(slug){
+    const e=EVENTS.find(x=>x.slug===slug);
+    if(!e)return `<div class="empty"><div class="ico">😕</div><h3>Evento não encontrado</h3></div>`;
+    return `<button class="btn btn-ghost" style="margin-bottom:18px" onclick="history.back()">← Voltar</button>
+    <div class="detail-hero">${e.img?`<img src="${e.img}" alt="">`:'🎵'}
+      <button class="fav ${FAVS.has(e.id)?'on':''}" style="position:absolute;right:16px;top:16px;z-index:3" onclick="toggleFav('${e.id}',this)">${heart(FAVS.has(e.id))}</button>
+    </div>
+    <div class="detail-grid">
+      <div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${genreBadge(e.genre)}${e.festival?'<span class="chip">Festival</span>':''}${e.featured?'<span class="chip" style="border-color:rgba(255,46,136,.4);color:var(--pink)">Destaque</span>':''}</div>
+        <h1 style="font-size:34px;font-weight:900;margin:0;letter-spacing:-.02em">${esc(e.title)}</h1>
+        <p style="font-size:18px;color:var(--muted);margin:8px 0 0">${esc(e.summary)}</p>
+        <p style="white-space:pre-line;color:rgba(245,245,247,.78);margin-top:20px;line-height:1.6">${esc(e.desc)}</p>
+        <a href="${e.src}" target="_blank" rel="noopener" style="display:inline-flex;gap:6px;align-items:center;color:rgba(255,255,255,.4);font-size:14px;margin-top:18px">↗ Fonte original</a>
+      </div>
+      <aside>
+        <div class="card" style="padding:20px;display:grid;gap:14px">
+          <div class="info-row"><span style="color:var(--cyan)">🕒</span><div><small>Quando</small><div style="font-weight:600;font-size:14px">${fmtLong(e.date)}</div></div></div>
+          <div class="info-row"><span style="color:var(--purple)">📍</span><div><small>Onde</small><div style="font-weight:600;font-size:14px">${esc(e.venue)}</div><div style="color:var(--muted);font-size:14px">${esc(e.addr)}, ${esc(e.city)}</div></div></div>
+          <div class="info-row"><span style="color:var(--lime)">🎟️</span><div><small>Preço</small><div style="font-weight:600;font-size:14px">${fmtPrice(e.min,e.max)}</div></div></div>
+          <a class="btn btn-primary" style="justify-content:center" href="${e.src}" target="_blank" rel="noopener">🎟️ Comprar bilhete</a>
+        </div>
+      </aside>
+    </div>`;
+  },
+};
+
+/* ─────────────────────────────────────────────────────────────
+   MAPA
+   ───────────────────────────────────────────────────────────── */
+let _map;
+function initMap(){
+  const el=document.getElementById('map'); if(!el)return;
+  if(typeof L==='undefined'){el.outerHTML='<div class="map-fallback card">Mapa indisponível offline — liga-te à internet para o ver.</div>';return;}
+  if(_map){_map.remove();_map=null;}
+  _map=L.map(el).setView([39.5,-8],7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(_map);
+  const icon=L.divIcon({className:'',html:'<div style="width:18px;height:18px;border-radius:99px;background:#8b5cf6;border:2px solid #fff;box-shadow:0 0 12px 2px rgba(139,92,246,.8)"></div>',iconSize:[18,18],iconAnchor:[9,9]});
+  const pts=[];
+  EVENTS.forEach(e=>{if(e.lat&&e.lng){pts.push([e.lat,e.lng]);
+    L.marker([e.lat,e.lng],{icon}).addTo(_map).bindPopup(`<b>${esc(e.title)}</b><br><small>${fmtDate(e.date)} · ${esc(e.city)}</small><br><a href="#/evento/${e.slug}" onclick="go('evento/${e.slug}')">Ver detalhe →</a>`);}});
+  if(pts.length)_map.fitBounds(pts,{padding:[40,40],maxZoom:11});
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ROUTER + RENDER
+   ───────────────────────────────────────────────────────────── */
+function toggleFav(id,btn){ FAVS.has(id)?FAVS.delete(id):FAVS.add(id); saveFavs();
+  if(btn){btn.classList.toggle('on',FAVS.has(id));btn.innerHTML=heart(FAVS.has(id));}
+  else render();
+}
+function go(route,ev){ if(ev)ev.preventDefault(); location.hash='#/'+route; window.scrollTo(0,0); }
+function currentRoute(){ return (location.hash.replace(/^#\//,'')||'home'); }
+function render(){
+  const route=currentRoute();
+  const [base,param]=route.split('/');
+  const view=VIEWS[base]||VIEWS.home;
+  document.getElementById('app').innerHTML=view(param);
+  // nav active states
+  document.getElementById('deskNav').innerHTML=NAV.map(([r,l])=>`<a href="#/${r==='home'?'':r}" class="${base===r?'active':''}" onclick="go('${r}',event)">${l}</a>`).join('');
+  const bn=[['home','Início','M3 9l7-6 7 6v8a1 1 0 0 1-1 1h-3v-5H7v5H4a1 1 0 0 1-1-1z'],
+    ['eventos','Eventos','M4 4h12v12H4z M4 8h12 M8 2v3 M12 2v3'],
+    ['submeter','Submeter','M10 4v12 M4 10h12'],
+    ['mapa','Mapa','M3 5l5-2 4 2 5-2v12l-5 2-4-2-5 2z M8 3v12 M12 5v12'],
+    ['favoritos','Favoritos','M10 16s-6-4.3-6-8.5A3.5 3.5 0 0 1 10 5a3.5 3.5 0 0 1 6 2.5C16 11.7 10 16 10 16Z']];
+  document.getElementById('bnav').innerHTML=bn.map(([r,l,p])=>`<a href="#/${r==='home'?'':r}" class="${base===r?'active':''}" onclick="go('${r}',event)"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="${p}"/></svg>${l}</a>`).join('');
+}
+window.addEventListener('hashchange',render);
+document.getElementById('yr').textContent=new Date().getFullYear();
+render();
+
+/* ─────────────────────────────────────────────────────────────
+   PWA (service worker + install)
+   ───────────────────────────────────────────────────────────── */
+if('serviceWorker' in navigator && location.protocol!=='file:'){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+let deferred;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;document.getElementById('install').classList.add('show');});
+document.getElementById('installBtn').onclick=async()=>{ if(!deferred)return; deferred.prompt(); await deferred.userChoice; deferred=null; document.getElementById('install').classList.remove('show'); };
+</script>
+</body>
+</html>
