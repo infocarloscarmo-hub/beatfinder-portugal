@@ -6,17 +6,9 @@ const GOABASE_URL = 'https://www.goabase.net/api/party/json/?country=Portugal';
 function mapType(t?: string): IngestEventInput['event_type'] {
   const s = (t ?? '').toLowerCase();
   if (s.includes('festival')) return 'festival';
-  if (s.includes('open')) return 'open_air';
-  if (s.includes('club')) return 'club';
+  if (s.includes('open') || s.includes('outdoor')) return 'open_air';
+  if (s.includes('club') || s.includes('indoor')) return 'club';
   return 'other';
-}
-
-/** Lê um campo tentando vários nomes possíveis (a API pode variar). */
-function pick(obj: any, keys: string[]): any {
-  for (const k of keys) {
-    if (obj && obj[k] != null && obj[k] !== '') return obj[k];
-  }
-  return undefined;
 }
 
 function toNum(v: any): number | undefined {
@@ -24,61 +16,68 @@ function toNum(v: any): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+// Só aceita coordenadas plausíveis para Portugal (continente + ilhas).
+// O Goabase às vezes tem geo a 0,0 ou errado.
+function ptGeo(lat?: number, lon?: number): { lat: number | null; lon: number | null } {
+  if (
+    lat != null && lon != null &&
+    lat >= 30 && lat <= 43 &&
+    lon >= -33 && lon <= -6 &&
+    !(lat === 0 && lon === 0)
+  ) {
+    return { lat, lon };
+  }
+  return { lat: null, lon: null };
+}
+
 /**
  * Vai buscar os eventos de Portugal ao Goabase e converte-os para o formato
- * de ingestão da app. Defensivo quanto aos nomes dos campos.
+ * de ingestão da app. Campos confirmados a partir da API real (chave `partylist`).
  */
 export async function fetchGoabaseEvents(): Promise<IngestEventInput[]> {
   const res = await fetch(GOABASE_URL, {
     headers: { Accept: 'application/json', 'User-Agent': 'BeatfinderPortugal/1.0' },
-    // sem cache — queremos sempre o mais recente
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(`Goabase respondeu ${res.status}`);
 
   const data: any = await res.json();
-  // A lista pode vir como array direto ou dentro de uma chave
-  const list: any[] =
-    (Array.isArray(data) && data) ||
-    data.listParties ||
-    data.parties ||
-    data.results ||
-    data.items ||
-    [];
+  const list: any[] = data.partylist || (Array.isArray(data) ? data : []) || [];
 
   const now = Date.now();
   const events: IngestEventInput[] = [];
 
   for (const p of list) {
-    const title = pick(p, ['nameParty', 'name', 'title', 'partyName']);
-    const dateStart = pick(p, ['dateStart', 'startDate', 'dateFrom', 'date']);
+    const title = p.nameParty;
+    const dateStart = p.dateStart;
     if (!title || !dateStart) continue;
 
-    // só eventos futuros
+    // só eventos futuros (margem de 1 dia)
     const start = new Date(dateStart).getTime();
     if (Number.isFinite(start) && start < now - 24 * 3600 * 1000) continue;
 
-    const id = pick(p, ['idParty', 'id', 'partyId', 'uid']);
+    const geo = ptGeo(toNum(p.geoLat), toNum(p.geoLon));
+    const image = p.urlImageLarge || p.urlImageFull || p.urlImageMedium || p.urlImageSmall || null;
 
     events.push({
       title: String(title).slice(0, 160),
+      description: undefined,
       summary: undefined,
-      description: pick(p, ['textMore', 'description', 'textTeaser', 'text']) || undefined,
       date_start: String(dateStart),
-      date_end: pick(p, ['dateEnd', 'endDate', 'dateTo']) || null,
-      city: pick(p, ['nameTown', 'town', 'city', 'locationTown']) || undefined,
+      date_end: p.dateEnd || null,
+      city: p.nameTown || undefined,
       country: 'Portugal',
-      venue_name: pick(p, ['nameLocation', 'location', 'venue', 'nameClub']) || undefined,
-      organizer_name: pick(p, ['nameOrganizer', 'organizer', 'promoter']) || undefined,
-      genre: undefined, // Goabase é sobretudo psy/goa; deixamos para classificar no admin
-      event_type: mapType(pick(p, ['typeParty', 'type', 'eventType'])),
-      is_festival: mapType(pick(p, ['typeParty', 'type', 'eventType'])) === 'festival',
-      ticket_url: pick(p, ['urlTicket', 'ticketUrl']) || null,
-      source_url: pick(p, ['urlParty', 'url', 'link', 'urlGoabase']) || `https://www.goabase.net/party/${id ?? ''}`,
-      image_url: pick(p, ['urlImage', 'image', 'imageUrl', 'urlImageFull']) || null,
-      latitude: toNum(pick(p, ['geoLat', 'lat', 'latitude'])) ?? null,
-      longitude: toNum(pick(p, ['geoLon', 'lng', 'lon', 'longitude'])) ?? null,
-      external_id: id != null ? `goabase-${id}` : null,
+      venue_name: undefined, // Goabase não dá sala na lista; fica a cidade
+      organizer_name: p.nameOrganizer || undefined,
+      genre: undefined, // psytrance/goa — classificar no admin
+      event_type: mapType(p.nameType),
+      is_festival: mapType(p.nameType) === 'festival',
+      ticket_url: null,
+      source_url: p.urlPartyHtml || (p.id ? `https://www.goabase.net/party/${p.id}` : null),
+      image_url: image,
+      latitude: geo.lat,
+      longitude: geo.lon,
+      external_id: p.id != null ? `goabase-${p.id}` : null,
       confidence_score: 0.7,
       source_name: 'Goabase',
       raw_payload: p,
