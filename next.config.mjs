@@ -6,8 +6,11 @@ const nextConfig = {
   // Não bloquear o deploy por erros de TypeScript (continua a correr `npm run type-check` em dev).
   typescript: { ignoreBuildErrors: true },
   images: {
+    // Permite imagens de qualquer URL (cartazes de eventos vêm de muitos sites).
+    unoptimized: true,
     remotePatterns: [
       { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
     ],
   },
   async headers() {
