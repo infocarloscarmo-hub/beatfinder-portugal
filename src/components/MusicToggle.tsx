@@ -4,28 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 import { Volume2 } from 'lucide-react';
 import { audioBus } from '@/lib/audioBus';
 
-const BPM = 122;
+// ── Psytech @ 138 BPM, estilo Luis M ──────────────────────────────
+const BPM = 138;
 const STEP = 60 / BPM / 4; // semicolcheia
 const LS_KEY = 'bf_music';
 
-// 4 padrões de baixo (16 passos cada) — alternam ao longo do tempo
-const BASS_PATTERNS: number[][] = [
-  [110, 0, 0, 0, 110, 0, 0, 164.81, 0, 0, 130.81, 0, 98, 0, 0, 0],
-  [110, 0, 110, 0, 0, 0, 164.81, 0, 130.81, 0, 0, 0, 98, 0, 98, 0],
-  [82.41, 0, 0, 0, 110, 0, 0, 0, 130.81, 0, 0, 0, 110, 0, 0, 0],
-  [110, 0, 0, 110, 0, 164.81, 0, 0, 130.81, 0, 130.81, 0, 98, 0, 0, 98],
-];
-
-// Progressão de acordes (Lá menor): Am, F, C, G — um por cada 4 compassos
-const CHORDS: number[][] = [
-  [220, 261.63, 329.63], // Am
-  [174.61, 220, 261.63], // F
-  [261.63, 329.63, 392.0], // C
-  [196.0, 246.94, 293.66], // G
-];
-
-// Arpejo melódico (Lá menor pentatónica) para a segunda metade do ciclo
-const ARP = [440, 523.25, 659.25, 587.33, 523.25, 440, 392.0, 329.63];
+// Raízes graves do baixo (Mi menor), mudam a cada 8 compassos
+const ROOTS = [41.2, 41.2, 36.71, 49.0]; // E1, E1, D1, G1
+// Notas para blips ácidos (escala de Mi menor, mais agudas)
+const ACID = [164.81, 196.0, 220.0, 246.94, 293.66, 246.94, 220.0, 196.0];
 
 export default function MusicToggle() {
   const [on, setOn] = useState(false);
@@ -41,7 +28,6 @@ export default function MusicToggle() {
       const C = new (window.AudioContext || (window as any).webkitAudioContext)();
       const m = C.createGain();
       m.gain.value = 0.0001;
-      // master → analisador → colunas (o analisador alimenta a animação do hero)
       const an = C.createAnalyser();
       an.fftSize = 256;
       an.smoothingTimeConstant = 0.8;
@@ -58,99 +44,123 @@ export default function MusicToggle() {
     return ctx.current;
   }
 
+  // Kick psy: seco e com punch
   function kick(t: number) {
     const C = ac();
     const o = C.createOscillator();
     const g = C.createGain();
-    o.frequency.setValueAtTime(150, t);
-    o.frequency.exponentialRampToValueAtTime(50, t + 0.12);
-    g.gain.setValueAtTime(0.9, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    o.frequency.setValueAtTime(165, t);
+    o.frequency.exponentialRampToValueAtTime(46, t + 0.09);
+    g.gain.setValueAtTime(1.0, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
     o.connect(g);
     g.connect(master.current!);
     o.start(t);
-    o.stop(t + 0.18);
+    o.stop(t + 0.15);
   }
 
-  function hat(t: number, vol: number) {
+  // Baixo rolante: saw + sub sine, filtro com envelope rápido (o "rolo" psy)
+  function rollBass(t: number, freq: number, openness: number) {
+    const C = ac();
+    const dur = STEP * 0.9;
+    const lp = C.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(700 + openness * 700, t);
+    lp.frequency.exponentialRampToValueAtTime(110, t + dur);
+    lp.Q.value = 11;
+    const g = C.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.55, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    lp.connect(g);
+    g.connect(master.current!);
+
+    const saw = C.createOscillator();
+    saw.type = 'sawtooth';
+    saw.frequency.value = freq;
+    saw.connect(lp);
+    saw.start(t);
+    saw.stop(t + dur + 0.02);
+
+    const sub = C.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.value = freq;
+    const sg = C.createGain();
+    sg.gain.setValueAtTime(0.0001, t);
+    sg.gain.exponentialRampToValueAtTime(0.4, t + 0.006);
+    sg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    sub.connect(sg);
+    sg.connect(master.current!);
+    sub.start(t);
+    sub.stop(t + dur + 0.02);
+  }
+
+  function hat(t: number, vol: number, open = false) {
     const C = ac();
     const s = C.createBufferSource();
     s.buffer = noise.current!;
     const hp = C.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.value = 7000;
+    hp.frequency.value = 8000;
     const g = C.createGain();
+    const dur = open ? 0.12 : 0.04;
     g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     s.connect(hp);
     hp.connect(g);
     g.connect(master.current!);
     s.start(t);
-    s.stop(t + 0.06);
+    s.stop(t + dur + 0.02);
   }
 
-  // cutoff varia ao longo do ciclo (0..1 → abre o filtro)
-  function bassNote(t: number, freq: number, openness: number) {
-    if (!freq) return;
+  // Blip ácido (lead resonante) com eco
+  function acid(t: number, freq: number) {
     const C = ac();
     const o = C.createOscillator();
     o.type = 'sawtooth';
     o.frequency.value = freq;
     const lp = C.createBiquadFilter();
     lp.type = 'lowpass';
-    const top = 400 + openness * 900;
-    lp.frequency.setValueAtTime(top, t);
-    lp.frequency.exponentialRampToValueAtTime(180, t + 0.22);
-    lp.Q.value = 7;
+    lp.frequency.setValueAtTime(2600, t);
+    lp.frequency.exponentialRampToValueAtTime(500, t + 0.18);
+    lp.Q.value = 16;
     const g = C.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-    o.connect(lp);
-    lp.connect(g);
-    g.connect(master.current!);
-    o.start(t);
-    o.stop(t + 0.25);
-  }
-
-  function pad(t: number, chord: number[]) {
-    const C = ac();
-    chord.forEach((f) => {
-      const o = C.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = f;
-      const g = C.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(0.05, t + 0.6);
-      g.gain.linearRampToValueAtTime(0.0001, t + STEP * 16 * 4);
-      o.connect(g);
-      g.connect(master.current!);
-      o.start(t);
-      o.stop(t + STEP * 16 * 4 + 0.1);
-    });
-  }
-
-  function lead(t: number, freq: number) {
-    const C = ac();
-    const o = C.createOscillator();
-    o.type = 'triangle';
-    o.frequency.value = freq;
-    const g = C.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.08, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
     const dl = C.createDelay();
     dl.delayTime.value = STEP * 3;
     const fb = C.createGain();
-    fb.gain.value = 0.3;
-    o.connect(g);
+    fb.gain.value = 0.35;
+    o.connect(lp);
+    lp.connect(g);
     g.connect(master.current!);
     g.connect(dl);
     dl.connect(fb);
     fb.connect(dl);
     dl.connect(master.current!);
     o.start(t);
-    o.stop(t + 0.32);
+    o.stop(t + 0.22);
+  }
+
+  // Drone atmosférico escuro (por compasso)
+  function drone(t: number, freq: number) {
+    const C = ac();
+    const o = C.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = freq;
+    const lp = C.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 600;
+    const g = C.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.04, t + 1.0);
+    g.gain.linearRampToValueAtTime(0.0001, t + STEP * 16);
+    o.connect(lp);
+    lp.connect(g);
+    g.connect(master.current!);
+    o.start(t);
+    o.stop(t + STEP * 16 + 0.1);
   }
 
   function scheduler() {
@@ -158,28 +168,33 @@ export default function MusicToggle() {
     while (nextTime.current < C.currentTime + 0.12) {
       const s = step.current % 16;
       const bar = Math.floor(step.current / 16);
-      const cyclePos = bar % 32; // ciclo de 32 compassos (~63s)
+      const cyclePos = bar % 32;
       const t = nextTime.current;
-      const openness = cyclePos / 32; // filtro abre ao longo do ciclo
+      const openness = (cyclePos % 16) / 16; // filtro abre/fecha em ciclos de 16 compassos
 
-      // bateria
-      if (s % 4 === 0) kick(t);
-      if (s % 4 === 2) hat(t, 0.15);
-      else if (s % 2 === 0) hat(t, 0.05);
+      // breakdown: 2 compassos sem kick a cada 16 (deixa respirar)
+      const breakdown = cyclePos === 14 || cyclePos === 15;
 
-      // baixo (padrão muda a cada 8 compassos)
-      const pattern = BASS_PATTERNS[Math.floor(bar / 8) % BASS_PATTERNS.length];
-      bassNote(t, pattern[s], openness);
+      // kick four-on-the-floor (exceto no breakdown)
+      if (!breakdown && s % 4 === 0) kick(t);
 
-      // acorde no início de cada 4 compassos
-      if (s === 0 && bar % 4 === 0) {
-        pad(t, CHORDS[Math.floor(bar / 4) % CHORDS.length]);
+      // baixo rolante: 3 notas graves entre cada kick
+      const root = ROOTS[Math.floor(bar / 8) % ROOTS.length];
+      if (s % 4 !== 0) rollBass(t, root, openness);
+
+      // hats
+      if (s % 4 === 2) hat(t, 0.22, true); // open hat em contratempo
+      else if (s % 2 === 1) hat(t, 0.08); // 16ths fechados
+
+      // drone no início de cada compasso
+      if (s === 0) drone(t, root * 2);
+
+      // blips ácidos na 2ª metade do ciclo, sincopados
+      if (cyclePos >= 16 && !breakdown && (s === 3 || s === 7 || s === 10 || s === 14)) {
+        acid(t, ACID[step.current % ACID.length]);
       }
-
-      // arpejo melódico só na 2ª metade do ciclo, em colcheias
-      if (cyclePos >= 16 && s % 2 === 0) {
-        lead(t, ARP[(step.current / 2) % ARP.length | 0]);
-      }
+      // no breakdown, mais ácido para criar tensão
+      if (breakdown && s % 2 === 0) acid(t, ACID[(step.current / 2) % ACID.length | 0]);
 
       nextTime.current += STEP;
       step.current++;
@@ -192,7 +207,7 @@ export default function MusicToggle() {
     if (C.state === 'suspended') await C.resume();
     master.current!.gain.cancelScheduledValues(C.currentTime);
     master.current!.gain.setValueAtTime(0.0001, C.currentTime);
-    master.current!.gain.linearRampToValueAtTime(0.26, C.currentTime + 1.2);
+    master.current!.gain.linearRampToValueAtTime(0.3, C.currentTime + 1.2);
     step.current = 0;
     nextTime.current = C.currentTime + 0.1;
     scheduler();
@@ -214,7 +229,6 @@ export default function MusicToggle() {
     try { localStorage.setItem(LS_KEY, 'off'); } catch {}
   }
 
-  // Se já estava ligada antes, arranca no primeiro toque (autoplay permitido).
   useEffect(() => {
     let pref: string | null = null;
     try { pref = localStorage.getItem(LS_KEY); } catch {}
@@ -244,9 +258,9 @@ export default function MusicToggle() {
     >
       {on ? (
         <span className="flex items-end gap-[2px]">
-          <span className="h-4 w-[3px] origin-bottom animate-[eq_0.6s_ease-in-out_infinite] rounded-full bg-neon-cyan" />
-          <span className="h-4 w-[3px] origin-bottom animate-[eq_0.6s_ease-in-out_infinite_0.15s] rounded-full bg-neon-purple" />
-          <span className="h-4 w-[3px] origin-bottom animate-[eq_0.6s_ease-in-out_infinite_0.3s] rounded-full bg-neon-pink" />
+          <span className="h-4 w-[3px] origin-bottom animate-[eq_0.5s_ease-in-out_infinite] rounded-full bg-neon-cyan" />
+          <span className="h-4 w-[3px] origin-bottom animate-[eq_0.5s_ease-in-out_infinite_0.12s] rounded-full bg-neon-purple" />
+          <span className="h-4 w-[3px] origin-bottom animate-[eq_0.5s_ease-in-out_infinite_0.24s] rounded-full bg-neon-pink" />
         </span>
       ) : (
         <Volume2 size={20} className="text-neon-purple" />

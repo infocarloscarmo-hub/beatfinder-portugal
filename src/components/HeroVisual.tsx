@@ -53,7 +53,7 @@ export default function HeroVisual() {
       ctx.clearRect(0, 0, w, h);
 
       // novas ondas ao ritmo (122 BPM quando toca, lento quando parado)
-      const interval = audioBus.playing ? (60 / 122) * 1000 : 1600;
+      const interval = audioBus.playing ? (60 / 138) * 1000 : 1600;
       beatAcc += dt;
       if (beatAcc >= interval) {
         beatAcc = 0;
