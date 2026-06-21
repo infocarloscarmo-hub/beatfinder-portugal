@@ -14,8 +14,8 @@ as $$
   where q is null
      or q = ''
      or to_tsvector('simple',
-          unaccent(coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' || coalesce(city,'')))
-        @@ plainto_tsquery('simple', unaccent(q))
+          public.f_unaccent(coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' || coalesce(city,'')))
+        @@ plainto_tsquery('simple', public.f_unaccent(q))
   order by date_start asc;
 $$;
 

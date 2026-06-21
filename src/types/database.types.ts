@@ -100,18 +100,23 @@ export interface ProfileRow {
 export type Database = {
   public: {
     Tables: {
-      events: { Row: EventRow; Insert: Partial<EventRow>; Update: Partial<EventRow> };
-      genres: { Row: GenreRow; Insert: Partial<GenreRow>; Update: Partial<GenreRow> };
-      venues: { Row: VenueRow; Insert: Partial<VenueRow>; Update: Partial<VenueRow> };
-      profiles: { Row: ProfileRow; Insert: Partial<ProfileRow>; Update: Partial<ProfileRow> };
+      events: { Row: EventRow; Insert: Partial<EventRow>; Update: Partial<EventRow>; Relationships: [] };
+      genres: { Row: GenreRow; Insert: Partial<GenreRow>; Update: Partial<GenreRow>; Relationships: [] };
+      venues: { Row: VenueRow; Insert: Partial<VenueRow>; Update: Partial<VenueRow>; Relationships: [] };
+      organizers: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown>; Relationships: [] };
+      event_sources: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown>; Relationships: [] };
+      featured_events: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown>; Relationships: [] };
+      alerts: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown>; Relationships: [] };
+      profiles: { Row: ProfileRow; Insert: Partial<ProfileRow>; Update: Partial<ProfileRow>; Relationships: [] };
       favorites: {
         Row: { user_id: string; event_id: string; created_at: string };
         Insert: { user_id: string; event_id: string };
         Update: Partial<{ user_id: string; event_id: string }>;
+        Relationships: [];
       };
     };
     Views: {
-      events_public: { Row: EventPublicRow };
+      events_public: { Row: EventPublicRow; Relationships: [] };
     };
     Functions: {
       search_events: { Args: { q: string }; Returns: EventPublicRow[] };

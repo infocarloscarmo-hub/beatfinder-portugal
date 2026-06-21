@@ -8,24 +8,36 @@ create extension if not exists "pgcrypto";   -- gen_random_uuid()
 create extension if not exists "unaccent";   -- pesquisa sem acentos
 -- (PostGIS é opcional. Usamos lat/long simples para portabilidade.)
 
+-- Wrapper IMMUTABLE de unaccent (necessário para usar em índices).
+-- Fixa o search_path para encontrar a extensão (que no Supabase vive no
+-- schema "extensions") e usa a forma de 1 argumento, sempre disponível.
+create or replace function public.f_unaccent(input text)
+returns text
+language sql
+immutable
+set search_path = extensions, public, pg_catalog
+as $fn$
+  select unaccent(input)
+$fn$;
+
 -- ─────────────────────────────────────────────
 -- ENUMS
 -- ─────────────────────────────────────────────
-do $$ begin
+do $do$ begin
   create type event_status as enum ('pending', 'approved', 'rejected', 'duplicate');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
+do $do$ begin
   create type event_type as enum ('club', 'festival', 'open_air', 'rave', 'showcase', 'boat', 'other');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
+do $do$ begin
   create type app_role as enum ('user', 'moderator', 'admin');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
+do $do$ begin
   create type alert_frequency as enum ('instant', 'daily', 'weekly');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
 -- ─────────────────────────────────────────────
 -- Função utilitária: updated_at automático
@@ -33,12 +45,12 @@ exception when duplicate_object then null; end $$;
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
-as $$
+as $fn$
 begin
   new.updated_at = now();
   return new;
 end;
-$$;
+$fn$;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- PROFILES (1:1 com auth.users)
@@ -54,6 +66,7 @@ create table if not exists public.profiles (
   updated_at  timestamptz not null default now()
 );
 
+drop trigger if exists trg_profiles_updated on public.profiles;
 create trigger trg_profiles_updated
   before update on public.profiles
   for each row execute function public.set_updated_at();
@@ -63,7 +76,7 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
-as $$
+as $fn$
 begin
   insert into public.profiles (id, email, full_name, avatar_url)
   values (
@@ -75,7 +88,7 @@ begin
   on conflict (id) do nothing;
   return new;
 end;
-$$;
+$fn$;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -88,12 +101,12 @@ returns boolean
 language sql
 stable
 security definer set search_path = public
-as $$
+as $fn$
   select exists (
     select 1 from public.profiles
     where id = auth.uid() and role in ('admin', 'moderator')
   );
-$$;
+$fn$;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- GENRES
@@ -125,6 +138,7 @@ create table if not exists public.venues (
   updated_at  timestamptz not null default now()
 );
 
+drop trigger if exists trg_venues_updated on public.venues;
 create trigger trg_venues_updated
   before update on public.venues
   for each row execute function public.set_updated_at();
@@ -146,6 +160,7 @@ create table if not exists public.organizers (
   updated_at  timestamptz not null default now()
 );
 
+drop trigger if exists trg_organizers_updated on public.organizers;
 create trigger trg_organizers_updated
   before update on public.organizers
   for each row execute function public.set_updated_at();
@@ -186,6 +201,7 @@ create table if not exists public.events (
   updated_at        timestamptz not null default now()
 );
 
+drop trigger if exists trg_events_updated on public.events;
 create trigger trg_events_updated
   before update on public.events
   for each row execute function public.set_updated_at();
@@ -203,7 +219,7 @@ create unique index if not exists idx_events_source_external
 -- Pesquisa full-text (título + summary + cidade), tolerante a acentos
 create index if not exists idx_events_search on public.events
   using gin (to_tsvector('simple',
-    unaccent(coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' || coalesce(city,''))));
+    public.f_unaccent(coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' || coalesce(city,''))));
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- EVENT_SOURCES (fontes de scraping / origem n8n)
@@ -220,6 +236,7 @@ create table if not exists public.event_sources (
   updated_at    timestamptz not null default now()
 );
 
+drop trigger if exists trg_event_sources_updated on public.event_sources;
 create trigger trg_event_sources_updated
   before update on public.event_sources
   for each row execute function public.set_updated_at();
@@ -279,6 +296,7 @@ create table if not exists public.alerts (
   updated_at    timestamptz not null default now()
 );
 
+drop trigger if exists trg_alerts_updated on public.alerts;
 create trigger trg_alerts_updated
   before update on public.alerts
   for each row execute function public.set_updated_at();
@@ -321,71 +339,91 @@ alter table public.favorites         enable row level security;
 alter table public.alerts            enable row level security;
 
 -- ── PROFILES ────────────────────────────────────────────────
+drop policy if exists "profiles_select_self_or_admin" on public.profiles;
 create policy "profiles_select_self_or_admin" on public.profiles
   for select using (auth.uid() = id or public.is_admin());
+drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self" on public.profiles
   for update using (auth.uid() = id);
+drop policy if exists "profiles_admin_all" on public.profiles;
 create policy "profiles_admin_all" on public.profiles
   for all using (public.is_admin()) with check (public.is_admin());
 
 -- ── GENRES (leitura pública, escrita admin) ─────────────────
+drop policy if exists "genres_read_all" on public.genres;
 create policy "genres_read_all" on public.genres
   for select using (true);
+drop policy if exists "genres_admin_write" on public.genres;
 create policy "genres_admin_write" on public.genres
   for all using (public.is_admin()) with check (public.is_admin());
 
 -- ── VENUES ──────────────────────────────────────────────────
+drop policy if exists "venues_read_all" on public.venues;
 create policy "venues_read_all" on public.venues
   for select using (true);
+drop policy if exists "venues_admin_write" on public.venues;
 create policy "venues_admin_write" on public.venues
   for all using (public.is_admin()) with check (public.is_admin());
 
 -- ── ORGANIZERS ──────────────────────────────────────────────
+drop policy if exists "organizers_read_all" on public.organizers;
 create policy "organizers_read_all" on public.organizers
   for select using (true);
+drop policy if exists "organizers_admin_write" on public.organizers;
 create policy "organizers_admin_write" on public.organizers
   for all using (public.is_admin()) with check (public.is_admin());
 
 -- ── EVENTS ──────────────────────────────────────────────────
 -- Público vê apenas aprovados; admin vê tudo.
+drop policy if exists "events_read_approved" on public.events;
 create policy "events_read_approved" on public.events
   for select using (status = 'approved' or public.is_admin());
 
 -- Qualquer pessoa (mesmo anónima) pode submeter — entra como 'pending'.
 -- A app deve forçar status='pending' no insert público.
+drop policy if exists "events_insert_public_pending" on public.events;
 create policy "events_insert_public_pending" on public.events
   for insert with check (status = 'pending');
 
 -- Só admin/moderator atualiza ou apaga.
+drop policy if exists "events_admin_update" on public.events;
 create policy "events_admin_update" on public.events
   for update using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "events_admin_delete" on public.events;
 create policy "events_admin_delete" on public.events
   for delete using (public.is_admin());
 
 -- ── EVENT_SOURCES (só admin) ────────────────────────────────
+drop policy if exists "sources_admin_all" on public.event_sources;
 create policy "sources_admin_all" on public.event_sources
   for all using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "source_links_admin_all" on public.event_source_links;
 create policy "source_links_admin_all" on public.event_source_links
   for all using (public.is_admin()) with check (public.is_admin());
 
 -- ── FEATURED_EVENTS (leitura pública, escrita admin) ────────
+drop policy if exists "featured_read_all" on public.featured_events;
 create policy "featured_read_all" on public.featured_events
   for select using (true);
+drop policy if exists "featured_admin_write" on public.featured_events;
 create policy "featured_admin_write" on public.featured_events
   for all using (public.is_admin()) with check (public.is_admin());
 
 -- ── FAVORITES (cada um gere os seus) ────────────────────────
+drop policy if exists "favorites_owner_all" on public.favorites;
 create policy "favorites_owner_all" on public.favorites
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ── ALERTS (cada um gere os seus) ───────────────────────────
+drop policy if exists "alerts_owner_all" on public.alerts;
 create policy "alerts_owner_all" on public.alerts
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Nota: a view events_public roda com privilégios do criador e já filtra
 -- por status='approved', servindo leitura anónima sem expor pendentes.
+
 -- ════════════════════════════════════════════════════════════════════════════
--- Beatfinder Portugal — Dados iniciais (géneros, fontes, cidades exemplo)
+-- Beatfinder Portugal — Dados iniciais (géneros, fontes)
 -- Migration 0003_seed
 -- ════════════════════════════════════════════════════════════════════════════
 
@@ -407,6 +445,7 @@ insert into public.event_sources (name, type, base_url, is_active) values
   ('Instagram (clubes/promotores)','instagram', 'https://instagram.com',  true),
   ('Submissões do site',           'manual',    null,                     true)
 on conflict do nothing;
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- Beatfinder Portugal — Funções RPC
 -- Migration 0004_functions
@@ -417,23 +456,23 @@ create or replace function public.search_events(q text)
 returns setof public.events_public
 language sql
 stable
-as $$
+as $fn$
   select *
   from public.events_public
   where q is null
      or q = ''
      or to_tsvector('simple',
-          unaccent(coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' || coalesce(city,'')))
-        @@ plainto_tsquery('simple', unaccent(q))
+          public.f_unaccent(coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' || coalesce(city,'')))
+        @@ plainto_tsquery('simple', public.f_unaccent(q))
   order by date_start asc;
-$$;
+$fn$;
 
 -- Alterna favorito do utilizador autenticado; devolve o novo estado
 create or replace function public.toggle_favorite(p_event_id uuid)
 returns boolean
 language plpgsql
 security definer set search_path = public
-as $$
+as $fn$
 declare
   v_exists boolean;
 begin
@@ -457,4 +496,4 @@ begin
     return true;
   end if;
 end;
-$$;
+$fn$;

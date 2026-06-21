@@ -8,6 +8,18 @@ create extension if not exists "pgcrypto";   -- gen_random_uuid()
 create extension if not exists "unaccent";   -- pesquisa sem acentos
 -- (PostGIS é opcional. Usamos lat/long simples para portabilidade.)
 
+-- Wrapper IMMUTABLE de unaccent (necessário para usar em índices).
+-- Fixa o search_path para encontrar a extensão (que no Supabase vive no
+-- schema "extensions") e usa a forma de 1 argumento, sempre disponível.
+create or replace function public.f_unaccent(input text)
+returns text
+language sql
+immutable
+set search_path = extensions, public, pg_catalog
+as $fn$
+  select unaccent(input)
+$fn$;
+
 -- ─────────────────────────────────────────────
 -- ENUMS
 -- ─────────────────────────────────────────────
@@ -203,7 +215,7 @@ create unique index if not exists idx_events_source_external
 -- Pesquisa full-text (título + summary + cidade), tolerante a acentos
 create index if not exists idx_events_search on public.events
   using gin (to_tsvector('simple',
-    unaccent(coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' || coalesce(city,''))));
+    public.f_unaccent(coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' || coalesce(city,''))));
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- EVENT_SOURCES (fontes de scraping / origem n8n)
