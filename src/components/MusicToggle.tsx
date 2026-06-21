@@ -4,11 +4,27 @@ import { useEffect, useRef, useState } from 'react';
 import { Volume2 } from 'lucide-react';
 
 const BPM = 122;
-const STEP = 60 / BPM / 4; // duração de uma semicolcheia (16 por compasso)
+const STEP = 60 / BPM / 4; // semicolcheia
 const LS_KEY = 'bf_music';
 
-// Bassline (Hz) ao longo de 16 passos — vibe deep/melodic em Lá menor
-const BASS = [110, 0, 0, 0, 110, 0, 0, 164.81, 0, 0, 130.81, 0, 98, 0, 0, 0];
+// 4 padrões de baixo (16 passos cada) — alternam ao longo do tempo
+const BASS_PATTERNS: number[][] = [
+  [110, 0, 0, 0, 110, 0, 0, 164.81, 0, 0, 130.81, 0, 98, 0, 0, 0],
+  [110, 0, 110, 0, 0, 0, 164.81, 0, 130.81, 0, 0, 0, 98, 0, 98, 0],
+  [82.41, 0, 0, 0, 110, 0, 0, 0, 130.81, 0, 0, 0, 110, 0, 0, 0],
+  [110, 0, 0, 110, 0, 164.81, 0, 0, 130.81, 0, 130.81, 0, 98, 0, 0, 98],
+];
+
+// Progressão de acordes (Lá menor): Am, F, C, G — um por cada 4 compassos
+const CHORDS: number[][] = [
+  [220, 261.63, 329.63], // Am
+  [174.61, 220, 261.63], // F
+  [261.63, 329.63, 392.0], // C
+  [196.0, 246.94, 293.66], // G
+];
+
+// Arpejo melódico (Lá menor pentatónica) para a segunda metade do ciclo
+const ARP = [440, 523.25, 659.25, 587.33, 523.25, 440, 392.0, 329.63];
 
 export default function MusicToggle() {
   const [on, setOn] = useState(false);
@@ -66,7 +82,8 @@ export default function MusicToggle() {
     s.stop(t + 0.06);
   }
 
-  function bassNote(t: number, freq: number) {
+  // cutoff varia ao longo do ciclo (0..1 → abre o filtro)
+  function bassNote(t: number, freq: number, openness: number) {
     if (!freq) return;
     const C = ac();
     const o = C.createOscillator();
@@ -74,8 +91,9 @@ export default function MusicToggle() {
     o.frequency.value = freq;
     const lp = C.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(520, t);
-    lp.frequency.exponentialRampToValueAtTime(180, t + 0.2);
+    const top = 400 + openness * 900;
+    lp.frequency.setValueAtTime(top, t);
+    lp.frequency.exponentialRampToValueAtTime(180, t + 0.22);
     lp.Q.value = 7;
     const g = C.createGain();
     g.gain.setValueAtTime(0.0001, t);
@@ -88,33 +106,74 @@ export default function MusicToggle() {
     o.stop(t + 0.25);
   }
 
-  function pad(t: number) {
+  function pad(t: number, chord: number[]) {
     const C = ac();
-    [220, 261.63, 329.63].forEach((f) => {
+    chord.forEach((f) => {
       const o = C.createOscillator();
       o.type = 'sine';
       o.frequency.value = f;
       const g = C.createGain();
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(0.05, t + 0.4);
-      g.gain.linearRampToValueAtTime(0.0001, t + STEP * 16);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.6);
+      g.gain.linearRampToValueAtTime(0.0001, t + STEP * 16 * 4);
       o.connect(g);
       g.connect(master.current!);
       o.start(t);
-      o.stop(t + STEP * 16 + 0.1);
+      o.stop(t + STEP * 16 * 4 + 0.1);
     });
+  }
+
+  function lead(t: number, freq: number) {
+    const C = ac();
+    const o = C.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = freq;
+    const g = C.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.08, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    const dl = C.createDelay();
+    dl.delayTime.value = STEP * 3;
+    const fb = C.createGain();
+    fb.gain.value = 0.3;
+    o.connect(g);
+    g.connect(master.current!);
+    g.connect(dl);
+    dl.connect(fb);
+    fb.connect(dl);
+    dl.connect(master.current!);
+    o.start(t);
+    o.stop(t + 0.32);
   }
 
   function scheduler() {
     const C = ac();
     while (nextTime.current < C.currentTime + 0.12) {
       const s = step.current % 16;
+      const bar = Math.floor(step.current / 16);
+      const cyclePos = bar % 32; // ciclo de 32 compassos (~63s)
       const t = nextTime.current;
+      const openness = cyclePos / 32; // filtro abre ao longo do ciclo
+
+      // bateria
       if (s % 4 === 0) kick(t);
       if (s % 4 === 2) hat(t, 0.15);
       else if (s % 2 === 0) hat(t, 0.05);
-      bassNote(t, BASS[s]);
-      if (s === 0) pad(t);
+
+      // baixo (padrão muda a cada 8 compassos)
+      const pattern = BASS_PATTERNS[Math.floor(bar / 8) % BASS_PATTERNS.length];
+      bassNote(t, pattern[s], openness);
+
+      // acorde no início de cada 4 compassos
+      if (s === 0 && bar % 4 === 0) {
+        pad(t, CHORDS[Math.floor(bar / 4) % CHORDS.length]);
+      }
+
+      // arpejo melódico só na 2ª metade do ciclo, em colcheias
+      if (cyclePos >= 16 && s % 2 === 0) {
+        lead(t, ARP[(step.current / 2) % ARP.length | 0]);
+      }
+
       nextTime.current += STEP;
       step.current++;
     }
@@ -126,7 +185,7 @@ export default function MusicToggle() {
     if (C.state === 'suspended') await C.resume();
     master.current!.gain.cancelScheduledValues(C.currentTime);
     master.current!.gain.setValueAtTime(0.0001, C.currentTime);
-    master.current!.gain.linearRampToValueAtTime(0.28, C.currentTime + 0.8);
+    master.current!.gain.linearRampToValueAtTime(0.26, C.currentTime + 1.2);
     step.current = 0;
     nextTime.current = C.currentTime + 0.1;
     scheduler();
@@ -140,13 +199,13 @@ export default function MusicToggle() {
     if (C && master.current) {
       master.current.gain.cancelScheduledValues(C.currentTime);
       master.current.gain.setValueAtTime(master.current.gain.value, C.currentTime);
-      master.current.gain.linearRampToValueAtTime(0.0001, C.currentTime + 0.4);
+      master.current.gain.linearRampToValueAtTime(0.0001, C.currentTime + 0.5);
     }
     setOn(false);
     try { localStorage.setItem(LS_KEY, 'off'); } catch {}
   }
 
-  // Se o utilizador já tinha ligado antes, arranca no primeiro toque (autoplay).
+  // Se já estava ligada antes, arranca no primeiro toque (autoplay permitido).
   useEffect(() => {
     let pref: string | null = null;
     try { pref = localStorage.getItem(LS_KEY); } catch {}
