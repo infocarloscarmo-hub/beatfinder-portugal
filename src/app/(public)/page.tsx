@@ -5,6 +5,7 @@ import { todayRange, weekendRange } from '@/lib/dates';
 import EventGrid from '@/components/events/EventGrid';
 import SearchBar from '@/components/events/SearchBar';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import HeroVisual from '@/components/HeroVisual';
 
 export const dynamic = 'force-dynamic'; // render a pedido (não consulta o Supabase no build)
 
@@ -25,7 +26,11 @@ export default async function HomePage() {
       <section className="relative overflow-hidden rounded-3xl border border-white/5 bg-gradient-to-br from-ink-800 via-ink-900 to-ink-950 px-6 py-12 md:px-12 md:py-16">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-neon-purple/20 blur-3xl" />
         <div className="absolute -bottom-24 -left-10 h-64 w-64 rounded-full bg-neon-pink/15 blur-3xl" />
-        <div className="relative max-w-2xl">
+        {/* Animação futurista do logótipo (reage à música) */}
+        <div className="pointer-events-none absolute inset-0 z-0 opacity-25 md:left-auto md:right-0 md:top-0 md:h-full md:w-1/2 md:opacity-100">
+          <HeroVisual />
+        </div>
+        <div className="relative z-10 max-w-2xl">
           <span className="chip mb-4"><Sparkles size={13} /> Radar automático de eventos</span>
           <h1 className="font-display text-4xl font-black leading-tight text-white md:text-6xl">
             Encontra a tua próxima <span className="brand-text">festa</span> em Portugal.

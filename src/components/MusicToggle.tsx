@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Volume2 } from 'lucide-react';
+import { audioBus } from '@/lib/audioBus';
 
 const BPM = 122;
 const STEP = 60 / BPM / 4; // semicolcheia
@@ -40,7 +41,13 @@ export default function MusicToggle() {
       const C = new (window.AudioContext || (window as any).webkitAudioContext)();
       const m = C.createGain();
       m.gain.value = 0.0001;
-      m.connect(C.destination);
+      // master → analisador → colunas (o analisador alimenta a animação do hero)
+      const an = C.createAnalyser();
+      an.fftSize = 256;
+      an.smoothingTimeConstant = 0.8;
+      m.connect(an);
+      an.connect(C.destination);
+      audioBus.analyser = an;
       const buf = C.createBuffer(1, Math.floor(C.sampleRate * 0.3), C.sampleRate);
       const d = buf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -189,6 +196,7 @@ export default function MusicToggle() {
     step.current = 0;
     nextTime.current = C.currentTime + 0.1;
     scheduler();
+    audioBus.playing = true;
     setOn(true);
     try { localStorage.setItem(LS_KEY, 'on'); } catch {}
   }
@@ -201,6 +209,7 @@ export default function MusicToggle() {
       master.current.gain.setValueAtTime(master.current.gain.value, C.currentTime);
       master.current.gain.linearRampToValueAtTime(0.0001, C.currentTime + 0.5);
     }
+    audioBus.playing = false;
     setOn(false);
     try { localStorage.setItem(LS_KEY, 'off'); } catch {}
   }
