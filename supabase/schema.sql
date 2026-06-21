@@ -214,7 +214,7 @@ create index if not exists idx_events_genre       on public.events (genre_id);
 create index if not exists idx_events_featured    on public.events (is_featured) where is_featured = true;
 create index if not exists idx_events_festival    on public.events (is_festival) where is_festival = true;
 create unique index if not exists idx_events_source_external
-  on public.events (source_url, external_id) where external_id is not null;
+  on public.events (source_url, external_id);
 
 -- Pesquisa full-text (título + summary + cidade), tolerante a acentos
 create index if not exists idx_events_search on public.events
